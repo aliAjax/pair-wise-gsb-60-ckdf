@@ -6,6 +6,7 @@
   import type { AuditEntry, CaseVersion, EvidenceItem, SignalStatus } from '$lib/models/signal';
   import { exportSignalReport } from '$lib/services/signal-service';
   import { signalStore } from '$lib/stores/signal-store';
+  import { traceabilityStore } from '$lib/stores/traceability-store';
   import type { ActionData, PageData } from './$types';
 
   export let data: PageData;
@@ -13,6 +14,15 @@
 
   $: signal = $signalStore.find((item) => item.id === data.id);
   $: nextVersion = (signal?.versions[0]?.version ?? 0) + 1;
+
+  $: traceState = $traceabilityStore;
+  $: traceReports = traceState.reports.filter((report) => report.signalId === signal?.id);
+  $: traceIdentifiers = traceState.identifiers.filter((identifier) =>
+    identifier.lotIds.some((lotId) => {
+      const lot = traceState.lots.find((item) => item.id === lotId);
+      return lot ? (signal?.affectedBatches ?? []).includes(lot.lotNumber) : false;
+    })
+  );
 
   const statusOptions: Array<{ value: SignalStatus; label: string }> = [
     { value: 'investigating', label: '转入调查' },
@@ -152,6 +162,64 @@
       {/if}
     </aside>
   </section>
+
+  {#if traceIdentifiers.length > 0 || traceReports.length > 0}
+    <section class="mb-6 rounded border border-surface-300-700 bg-surface-100-900 p-4">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 class="font-semibold">标识追溯链</h2>
+          <p class="mt-1 text-xs text-surface-500-400">该信号关联的器械标识、注册证与追溯报告；上游版本变更会影响未签发报告。</p>
+        </div>
+        <a class="text-sm text-primary-700-300 hover:underline" href="/traceability">进入标识追溯</a>
+      </div>
+      <div class="mt-4 grid gap-4 lg:grid-cols-2">
+        {#each traceIdentifiers as identifier (identifier.id)}
+          {@const cert = traceState.certificates.find((item) => item.id === identifier.certId)}
+          <div class="rounded border border-surface-300-700 p-3 text-sm">
+            <div class="flex flex-wrap items-center gap-2">
+              <p class="font-medium">{identifier.productName}</p>
+              {#if identifier.status === 'pending_review'}
+                <span class="badge bg-amber-100 text-amber-950">待核</span>
+              {:else}
+                <span class="badge bg-emerald-100 text-emerald-900">标识 V{identifier.version}</span>
+              {/if}
+            </div>
+            <p class="mt-1 text-xs text-surface-500-400">
+              UDI {identifier.udi} · 注册证 {cert?.certNumber ?? '未关联'}{cert ? ` V${cert.version}` : ''}
+            </p>
+          </div>
+        {/each}
+        {#each traceReports as report (report.id)}
+          <div class="rounded border border-surface-300-700 p-3 text-sm">
+            <div class="flex flex-wrap items-center gap-2">
+              <p class="font-medium">{report.id}</p>
+              <span
+                class="badge {report.status === 'issued'
+                  ? 'bg-emerald-100 text-emerald-900'
+                  : report.status === 'invalidated'
+                    ? 'bg-red-100 text-red-950'
+                    : 'bg-amber-100 text-amber-950'}"
+              >
+                {report.status === 'issued' ? '已签发' : report.status === 'invalidated' ? '已失效' : '未签发'}
+              </span>
+              {#if report.reconsiderations.some((item) => item.status === 'open')}
+                <span class="badge bg-amber-100 text-amber-950">
+                  {report.reconsiderations.filter((item) => item.status === 'open').length} 项待复议
+                </span>
+              {/if}
+            </div>
+            <p class="mt-1 text-xs text-surface-500-400">
+              依据：标识 V{report.basis.identifierVersion ?? '待核'} · 注册证 V{report.basis.certVersion} ·
+              {report.basis.lots.map((lot) => `${lot.lotNumber} V${lot.version}`).join('、') || '无批号'}
+            </p>
+            {#if report.status === 'invalidated' && report.invalidationReason}
+              <p class="mt-1 text-xs text-red-900">失效原因：{report.invalidationReason}</p>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    </section>
+  {/if}
 
   <section class="mb-6">
     <div class="mb-4 flex flex-wrap items-end justify-between gap-3">

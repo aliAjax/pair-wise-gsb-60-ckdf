@@ -18,15 +18,18 @@
     <h1 class="text-2xl font-semibold">批次追踪</h1>
     <p class="mt-1 text-sm text-surface-600-300">按生产批号或软件版本追踪信号覆盖、报告数量和高风险关联。</p>
   </div>
-  <label class="min-w-[240px]">
-    <span class="mb-1 block text-sm font-medium">目标批号</span>
-    <select class="select" bind:value={selectedBatch}>
-      <option value="all">全部批号</option>
-      {#each batches as batch}
-        <option value={batch}>{batch}</option>
-      {/each}
-    </select>
-  </label>
+  <div class="flex flex-wrap items-end gap-2">
+    <a class="btn variant-soft-primary" href="/trace">查看标识追溯链</a>
+    <label class="min-w-[240px]">
+      <span class="mb-1 block text-sm font-medium">目标批号</span>
+      <select class="select" bind:value={selectedBatch}>
+        <option value="all">全部批号</option>
+        {#each batches as batch}
+          <option value={batch}>{batch}</option>
+        {/each}
+      </select>
+    </label>
+  </div>
 </div>
 
 <section class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
